@@ -160,13 +160,12 @@
         let compromisos = {};
         let cobros = {};
 
-        // 1. Carga automática inicial al abrir la app
+        // Carga automática inicial
         window.addEventListener('DOMContentLoaded', () => {
             iniciarSincronizacionRemota();
             cargarCarteraBaseGoogleSheets();
         });
 
-        // 2. Escuchar cambios de todos los asesores en tiempo real
         function iniciarSincronizacionRemota() {
             db.ref('coop_gestiones').on('value', snapshot => {
                 gestiones = snapshot.val() || {};
@@ -184,7 +183,6 @@
             });
         }
 
-        // 3. Lectura automática desde Google Sheets
         function cargarCarteraBaseGoogleSheets() {
             Papa.parse(SHEET_PUB_URL, {
                 download: true,
@@ -263,7 +261,6 @@
             applyFilters();
         }
 
-        // Abrir ubicación en Google Maps
         function abrirGoogleMaps(direccion) {
             if (!direccion || direccion.trim() === '') {
                 alert('El socio no tiene una dirección registrada.');
@@ -273,7 +270,6 @@
             window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
         }
 
-        // Enviar WhatsApp al socio
         function enviarWhatsApp(id) {
             const item = credits.find(c => c.id === id);
             if (!item) return;
@@ -293,7 +289,6 @@
             window.open(`https://wa.me/${phoneClean}?text=${encodeURIComponent(mensaje)}`, '_blank');
         }
 
-        // Registrar cobro y sincronizar con Firebase
         function registrarCobro(id) {
             const item = credits.find(c => c.id === id);
             if (!item) return;
@@ -325,7 +320,6 @@
             }
         }
 
-        // Registrar compromiso y sincronizar
         function registrarCompromiso(id) {
             const fechaCompromiso = prompt("Fecha pactada para el pago (AAAA-MM-DD):", new Date().toISOString().split('T')[0]);
             if (!fechaCompromiso) return;
@@ -347,39 +341,49 @@
             db.ref(`coop_gestiones/${id}`).set(listaGestiones);
         }
 
-        // Registrar Visita capturando la Ubicación GPS en tiempo real
+        // REGISTRO DE VISITA CON GPS OBLIGATORIO
         function registrarVisita(id) {
-            const result = prompt("Informe el resultado de la visita en campo:");
-            if (!result) return;
-
-            const fechaHora = new Date().toLocaleString('es-EC');
-            const listaGestiones = gestiones[id] || [];
-
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-                        const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
-                        
-                        const notaConGps = `${result} | 📍 GPS: <a href="${mapsUrl}" target="_blank">Ver Punto de Visita (${lat.toFixed(5)}, ${lng.toFixed(5)})</a>`;
-                        
-                        listaGestiones.unshift({ fecha: fechaHora, nota: notaConGps });
-                        db.ref(`coop_gestiones/${id}`).set(listaGestiones);
-                        alert("Visita registrada con ubicación GPS capturada.");
-                    },
-                    (error) => {
-                        console.warn("No se pudo obtener el GPS:", error.message);
-                        listaGestiones.unshift({ fecha: fechaHora, nota: result });
-                        db.ref(`coop_gestiones/${id}`).set(listaGestiones);
-                        alert("Visita registrada sin GPS.");
-                    },
-                    { enableHighAccuracy: true, timeout: 8000 }
-                );
-            } else {
-                listaGestiones.unshift({ fecha: fechaHora, nota: result });
-                db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+            if (!navigator.geolocation) {
+                alert("❌ ERROR CRÍTICO: Tu navegador o dispositivo no soporta la función de GPS. No es posible registrar la visita.");
+                return;
             }
+
+            alert("📡 Obteniendo ubicación GPS... Por favor permite el acceso a la ubicación si tu teléfono lo solicita.");
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+
+                    // Solicitar el informe únicamente tras confirmar la ubicación GPS
+                    const result = prompt("✅ GPS obtenido correctamente.\n\nIngrese la observación de la visita en campo:");
+                    if (!result || !result.trim()) {
+                        alert("Visita cancelada. No se ingresó ninguna observación.");
+                        return;
+                    }
+
+                    const fechaHora = new Date().toLocaleString('es-EC');
+                    const listaGestiones = gestiones[id] || [];
+                    const notaConGps = `${result.trim()} | 📍 GPS: <a href="${mapsUrl}" target="_blank">Ver Ubicación Exacta (${lat.toFixed(5)}, ${lng.toFixed(5)})</a>`;
+
+                    listaGestiones.unshift({ fecha: fechaHora, nota: notaConGps });
+                    db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+                    alert("¡Visita registrada y sincronizada con éxito junto con las coordenadas GPS!");
+                },
+                (error) => {
+                    let mensaje = "No se pudo obtener la ubicación GPS.";
+                    if (error.code === error.PERMISSION_DENIED) {
+                        mensaje = "❌ ACCESO DENEGADO: Has rechazado el permiso de ubicación. Debes activar el GPS y permitir el acceso al navegador para poder registrar la visita.";
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        mensaje = "❌ GPS NO DISPONIBLE: Asegúrate de tener activada la Ubicación/GPS en los ajustes de tu celular.";
+                    } else if (error.code === error.TIMEOUT) {
+                        mensaje = "⏳ TIEMPO AGOTADO: Se agotó el tiempo buscando señal GPS. Inténtalo de nuevo en un lugar abierto.";
+                    }
+                    alert(mensaje + "\n\n⚠️ REGISTRO CANCELADO: No se guardó la visita.");
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
         }
 
         function populateOficialesDropdown() {
