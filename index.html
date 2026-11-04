@@ -6,9 +6,10 @@
     <title>Sistema Colaborativo de Cobranzas y Campo</title>
     <!-- PapaParse para la lectura automática de Google Sheets -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <!-- SDK de Firebase Database para sincronización remota en tiempo real -->
+    <!-- SDK de Firebase Database y Authentication -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <style>
         :root {
             --primary: #0284c7;
@@ -44,7 +45,21 @@
 
         label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; color: #475569; }
         input, select, button { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 0.95rem; }
+        button { background-color: var(--primary); color: white; border: none; font-weight: 600; cursor: pointer; }
+        button:hover { background-color: var(--primary-dark); }
         
+        /* Pantalla de Login */
+        #loginScreen {
+            max-width: 400px;
+            margin: 60px auto;
+            text-align: center;
+        }
+        .login-header { font-size: 1.4rem; font-weight: bold; margin-bottom: 16px; color: var(--primary-dark); }
+        .error-msg { color: var(--danger); font-weight: bold; font-size: 0.85rem; margin-top: 10px; display: none; }
+
+        /* Contenido de la app */
+        #appContent { display: none; }
+
         .client-card { border-left: 6px solid var(--primary); margin-bottom: 12px; padding: 12px; background: #fff; border-radius: 6px; border: 1px solid var(--border); }
         .client-card.mora-alta { border-left-color: var(--danger); }
         .client-card.mora-media { border-left-color: var(--warning); }
@@ -65,6 +80,7 @@
         .btn-emerald { background-color: var(--emerald); }
         .btn-teal { background-color: var(--teal); }
         .btn-warning { background-color: var(--warning); color: #000; }
+        .btn-logout { background-color: #64748b; padding: 4px 10px; font-size: 0.8rem; width: auto; }
 
         .historial-box { background: #f8fafc; padding: 10px; border-radius: 6px; margin-top: 8px; font-size: 0.85rem; border: 1px dashed var(--border); }
         .visita-item { border-bottom: 1px solid #e2e8f0; padding: 6px 0; }
@@ -77,94 +93,160 @@
         .kpi-container { display: flex; justify-content: space-around; background: #0f172a; color: white; padding: 12px; border-radius: 8px; margin-bottom: 14px; text-align: center; }
         .kpi-title { font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; }
         .kpi-value { font-size: 1.1rem; font-weight: bold; }
-        .status-sync { text-align: right; font-size: 0.8rem; color: #059669; font-weight: bold; margin-bottom: 8px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.85rem; }
     </style>
 </head>
 <body>
 
-    <div class="status-sync" id="syncStatus">🟢 Conectado en Vivo a Firebase</div>
-    <h1>🏢 Control de Cobranzas y Seguimiento Compartido</h1>
-
-    <!-- KPI Resumen Global -->
-    <div class="kpi-container">
-        <div>
-            <div class="kpi-title">Socios Registrados</div>
-            <div class="kpi-value" id="kpiTotal">0</div>
+    <!-- Formulario de Autenticación -->
+    <div id="loginScreen" class="card">
+        <div class="login-header">🏢 Acceso al Sistema de Cobranzas</div>
+        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 16px;">Ingrese sus credenciales para continuar</p>
+        <div style="text-align: left; margin-bottom: 12px;">
+            <label>Correo Electrónico</label>
+            <input type="email" id="loginEmail" placeholder="ejemplo@cooperativa.fin.ec">
         </div>
-        <div>
-            <div class="kpi-title">Saldo en Riesgo</div>
-            <div class="kpi-value" id="kpiSaldo">$0.00</div>
+        <div style="text-align: left; margin-bottom: 16px;">
+            <label>Contraseña</label>
+            <input type="password" id="loginPassword" placeholder="••••••••">
         </div>
-        <div>
-            <div class="kpi-title">Pagan Hoy / Compromisos</div>
-            <div class="kpi-value" id="kpiHoy">0</div>
-        </div>
-        <div>
-            <div class="kpi-title">Recaudado Hoy (Agencia)</div>
-            <div class="kpi-value" id="kpiRecaudado" style="color: #34d399;">$0.00</div>
-        </div>
+        <button id="btnLogin" onclick="ejecutarLogin()">🔒 Iniciar Sesión</button>
+        <div id="loginError" class="error-msg"></div>
     </div>
 
-    <!-- Filtros por Asesor u Oficial -->
-    <div class="card grid-4">
-        <div>
-            <label>👤 Asesor / Oficial (Columna T)</label>
-            <select id="filterOficial" onchange="applyFilters()">
-                <option value="TODOS">-- Todos los Asesores --</option>
-            </select>
+    <!-- Contenido Principal de la App (Protegido) -->
+    <div id="appContent">
+        <div class="top-bar">
+            <span>👤 Sesión activa: <strong id="userDisplay">...</strong></span>
+            <button class="btn-logout" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
         </div>
-        <div>
-            <label>📅 Estado / Día</label>
-            <select id="filterEstado" onchange="applyFilters()">
-                <option value="TODOS">-- Ver Toda la Cartera --</option>
-                <option value="PAGAN_HOY">🗓️ SOCIOS QUE PAGAN HOY / COMPROMISOS</option>
-                <option value="CON_COMPROMISO">🤝 Con Compromiso Agendado</option>
-                <option value="EN_MORA">⚠️ En Mora (> 0 días)</option>
-                <option value="CANCELADO">✅ Créditos Cancelados / Saldo $0</option>
-            </select>
-        </div>
-        <div>
-            <label>⚡ Prioridad de Cobro</label>
-            <select id="sortBy" onchange="applyFilters()">
-                <option value="compromiso_asc">Fecha de Pago / Compromiso más Cercana</option>
-                <option value="mora_desc">Mayor Días de Mora</option>
-                <option value="saldo_desc">Mayor Saldo Vencido</option>
-                <option value="nombre_asc">Nombre del Socio (A-Z)</option>
-            </select>
-        </div>
-        <div>
-            <label>🔍 Buscar Socio / Cédula / Op.</label>
-            <input type="text" id="searchInput" placeholder="Escribe para buscar..." onkeyup="applyFilters()">
-        </div>
-    </div>
 
-    <!-- Lista de Socios -->
-    <div class="card">
-        <h2>Socios en Cartera (<span id="count">0</span>)</h2>
-        <div id="clientsList">Cargando base de datos compartida...</div>
+        <h1>🏢 Control de Cobranzas y Seguimiento Compartido</h1>
+
+        <!-- KPI Resumen Global -->
+        <div class="kpi-container">
+            <div>
+                <div class="kpi-title">Socios Registrados</div>
+                <div class="kpi-value" id="kpiTotal">0</div>
+            </div>
+            <div>
+                <div class="kpi-title">Saldo en Riesgo</div>
+                <div class="kpi-value" id="kpiSaldo">$0.00</div>
+            </div>
+            <div>
+                <div class="kpi-title">Pagan Hoy / Compromisos</div>
+                <div class="kpi-value" id="kpiHoy">0</div>
+            </div>
+            <div>
+                <div class="kpi-title">Recaudado Hoy (Agencia)</div>
+                <div class="kpi-value" id="kpiRecaudado" style="color: #34d399;">$0.00</div>
+            </div>
+        </div>
+
+        <!-- Filtros por Asesor u Oficial -->
+        <div class="card grid-4">
+            <div>
+                <label>👤 Asesor / Oficial (Columna T)</label>
+                <select id="filterOficial" onchange="applyFilters()">
+                    <option value="TODOS">-- Todos los Asesores --</option>
+                </select>
+            </div>
+            <div>
+                <label>📅 Estado / Día</label>
+                <select id="filterEstado" onchange="applyFilters()">
+                    <option value="TODOS">-- Ver Toda la Cartera --</option>
+                    <option value="PAGAN_HOY">🗓️ SOCIOS QUE PAGAN HOY / COMPROMISOS</option>
+                    <option value="CON_COMPROMISO">🤝 Con Compromiso Agendado</option>
+                    <option value="EN_MORA">⚠️ En Mora (> 0 días)</option>
+                    <option value="CANCELADO">✅ Créditos Cancelados / Saldo $0</option>
+                </select>
+            </div>
+            <div>
+                <label>⚡ Prioridad de Cobro</label>
+                <select id="sortBy" onchange="applyFilters()">
+                    <option value="compromiso_asc">Fecha de Pago / Compromiso más Cercana</option>
+                    <option value="mora_desc">Mayor Días de Mora</option>
+                    <option value="saldo_desc">Mayor Saldo Vencido</option>
+                    <option value="nombre_asc">Nombre del Socio (A-Z)</option>
+                </select>
+            </div>
+            <div>
+                <label>🔍 Buscar Socio / Cédula / Op.</label>
+                <input type="text" id="searchInput" placeholder="Escribe para buscar..." onkeyup="applyFilters()">
+            </div>
+        </div>
+
+        <!-- Lista de Socios -->
+        <div class="card">
+            <h2>Socios en Cartera (<span id="count">0</span>)</h2>
+            <div id="clientsList">Cargando base de datos compartida...</div>
+        </div>
     </div>
 
     <script>
-        // Enlace público CSV de Google Sheets
         const SHEET_PUB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0sM7zNvYvD6Jamg3PEX19P6uwSSYtKDo-m3WbuuvAgOeQe8SFe4mT2oiAr0NeA19GAvgAu6KoffEI/pub?gid=50945204&single=true&output=csv';
 
-        // Base de Datos en Tiempo Real en la Nube
         const firebaseConfig = {
             databaseURL: "https://cooperativa-cobranzas-default-rtdb.firebaseio.com"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        const auth = firebase.auth();
 
         let credits = [];
         let gestiones = {};
         let compromisos = {};
         let cobros = {};
 
-        // Carga automática inicial
-        window.addEventListener('DOMContentLoaded', () => {
-            iniciarSincronizacionRemota();
-            cargarCarteraBaseGoogleSheets();
+        // Control de Estado de Sesión en Tiempo Real
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('appContent').style.display = 'block';
+                document.getElementById('userDisplay').innerText = user.email;
+                
+                iniciarSincronizacionRemota();
+                cargarCarteraBaseGoogleSheets();
+            } else {
+                document.getElementById('loginScreen').style.display = 'block';
+                document.getElementById('appContent').style.display = 'none';
+            }
         });
+
+        function ejecutarLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            const errorDiv = document.getElementById('loginError');
+            const btn = document.getElementById('btnLogin');
+
+            errorDiv.style.display = 'none';
+            if (!email || !password) {
+                errorDiv.innerText = "Por favor ingrese su correo y contraseña.";
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            btn.innerText = "Verificando...";
+            btn.disabled = true;
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then(() => {
+                    btn.innerText = "🔒 Iniciar Sesión";
+                    btn.disabled = false;
+                })
+                .catch(err => {
+                    btn.innerText = "🔒 Iniciar Sesión";
+                    btn.disabled = false;
+                    errorDiv.innerText = "Credenciales incorrectas o usuario no autorizado.";
+                    errorDiv.style.display = 'block';
+                });
+        }
+
+        function cerrarSesion() {
+            if (confirm("¿Deseas cerrar tu sesión?")) {
+                auth.signOut();
+            }
+        }
 
         function iniciarSincronizacionRemota() {
             db.ref('coop_gestiones').on('value', snapshot => {
@@ -199,7 +281,7 @@
         function procesarFilasDirectas(rows) {
             const headers = rows[0].map(h => String(h).trim());
             
-            let idxOficial = 19; // Columna T (Oficial)
+            let idxOficial = 19;
             const foundIdxOficial = headers.findIndex(h => h.toLowerCase() === 'oficial');
             if (foundIdxOficial !== -1) idxOficial = foundIdxOficial;
 
@@ -356,7 +438,6 @@
                     const lng = position.coords.longitude;
                     const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
 
-                    // Solicitar el informe únicamente tras confirmar la ubicación GPS
                     const result = prompt("✅ GPS obtenido correctamente.\n\nIngrese la observación de la visita en campo:");
                     if (!result || !result.trim()) {
                         alert("Visita cancelada. No se ingresó ninguna observación.");
