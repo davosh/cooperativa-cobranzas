@@ -82,7 +82,7 @@
 </head>
 <body>
 
-    <div class="status-sync" id="syncStatus">🟢 Conectado en Vivo a la Cartera</div>
+    <div class="status-sync" id="syncStatus">🟢 Conectado en Vivo a Firebase</div>
     <h1>🏢 Control de Cobranzas y Seguimiento Compartido</h1>
 
     <!-- KPI Resumen Global -->
@@ -148,7 +148,7 @@
         // Enlace público CSV de Google Sheets
         const SHEET_PUB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0sM7zNvYvD6Jamg3PEX19P6uwSSYtKDo-m3WbuuvAgOeQe8SFe4mT2oiAr0NeA19GAvgAu6KoffEI/pub?gid=50945204&single=true&output=csv';
 
-        // Configuración de base de datos remota de Firebase (Gratuito)
+        // Base de Datos en Tiempo Real en la Nube
         const firebaseConfig = {
             databaseURL: "https://cooperativa-cobranzas-default-rtdb.firebaseio.com"
         };
@@ -238,7 +238,7 @@
 
                 const idClean = String(operacion || cedula || i).replace(/[^a-zA-Z0-9]/g, '');
 
-                // Calcular saldo ajustado por los cobros registrados colectivamente
+                // Calcular saldo ajustado por los cobros registrados colectivamente en Firebase
                 let saldoActual = cleanSaldo;
                 if (cobros[idClean]) {
                     const totalCobrado = cobros[idClean].reduce((acc, curr) => acc + curr.monto, 0);
@@ -283,7 +283,7 @@
             const comprobante = prompt("Comprobante / Recibo (opcional):", "") || "N/A";
             const fechaHora = new Date().toLocaleString('es-EC');
 
-            // Guardar en la nube para que se actualice en el celular de todos los asesores
+            // Guardar en la nube (se actualiza automáticamente para todos los oficiales)
             const listaCobros = cobros[id] || [];
             listaCobros.unshift({ fecha: fechaHora, monto: montoPago, metodo: metodoTexto, comprobante: comprobante });
             db.ref(`coop_cobros/${id}`).set(listaCobros);
