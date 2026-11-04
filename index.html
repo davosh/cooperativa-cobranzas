@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Colaborativo de Cobranzas y Campo</title>
+    <!-- PapaParse para la lectura automática de Google Sheets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- SDK de Firebase Database para sincronización remota en tiempo real -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #0f172a;
+            --border: #cbd5e1;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --purple: #8b5cf6;
+            --indigo: #4f46e5;
+            --teal: #0d9488;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 12px;
+            max-width: 980px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        h1, h2 { margin-top: 0; color: var(--text); }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        
+        .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+        @media (max-width: 768px) { .grid-4 { grid-template-columns: 1fr; } }
+
+        label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; color: #475569; }
+        input, select, button { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 0.95rem; }
+        
+        .client-card { border-left: 6px solid var(--primary); margin-bottom: 12px; padding: 12px; background: #fff; border-radius: 6px; border: 1px solid var(--border); }
+        .client-card.mora-alta { border-left-color: var(--danger); }
+        .client-card.mora-media { border-left-color: var(--warning); }
+        .client-card.al-dia { border-left-color: var(--success); }
+        .client-card.cancelado { border-left-color: var(--teal); opacity: 0.85; }
+
+        .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; color: white; font-weight: bold; display: inline-block; }
+        .badge-danger { background-color: var(--danger); }
+        .badge-warning { background-color: var(--warning); }
+        .badge-success { background-color: var(--success); }
+        .badge-indigo { background-color: var(--indigo); }
+        .badge-teal { background-color: var(--teal); }
+        
+        .btn-small { padding: 6px 10px; font-size: 0.85rem; width: auto; display: inline-block; margin-top: 6px; margin-right: 4px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: 600; }
+        .btn-success { background-color: var(--success); }
+        .btn-indigo { background-color: var(--indigo); }
+        .btn-purple { background-color: var(--purple); }
+        .btn-emerald { background-color: var(--emerald); }
+        .btn-teal { background-color: var(--teal); }
+        .btn-warning { background-color: var(--warning); color: #000; }
+
+        .historial-box { background: #f8fafc; padding: 10px; border-radius: 6px; margin-top: 8px; font-size: 0.85rem; border: 1px dashed var(--border); }
+        .visita-item { border-bottom: 1px solid #e2e8f0; padding: 6px 0; }
+        .visita-item:last-child { border-bottom: none; }
+
+        .compromiso-alert { background-color: #e0e7ff; border: 1px solid #c7d2fe; color: #3730a3; padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 0.88rem; font-weight: 600; }
+        .compromiso-vencido { background-color: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; }
+        .compromiso-hoy { background-color: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
+
+        .kpi-container { display: flex; justify-content: space-around; background: #0f172a; color: white; padding: 12px; border-radius: 8px; margin-bottom: 14px; text-align: center; }
+        .kpi-title { font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; }
+        .kpi-value { font-size: 1.1rem; font-weight: bold; }
+        .status-sync { text-align: right; font-size: 0.8rem; color: #059669; font-weight: bold; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+
+    <div class="status-sync" id="syncStatus">🟢 Conectado en Vivo a la Cartera</div>
+    <h1>🏢 Control de Cobranzas y Seguimiento Compartido</h1>
+
+    <!-- KPI Resumen Global -->
+    <div class="kpi-container">
+        <div>
+            <div class="kpi-title">Socios Registrados</div>
+            <div class="kpi-value" id="kpiTotal">0</div>
+        </div>
+        <div>
+            <div class="kpi-title">Saldo en Riesgo</div>
+            <div class="kpi-value" id="kpiSaldo">$0.00</div>
+        </div>
+        <div>
+            <div class="kpi-title">Pagan Hoy / Compromisos</div>
+            <div class="kpi-value" id="kpiHoy">0</div>
+        </div>
+        <div>
+            <div class="kpi-title">Recaudado Hoy (Agencia)</div>
+            <div class="kpi-value" id="kpiRecaudado" style="color: #34d399;">$0.00</div>
+        </div>
+    </div>
+
+    <!-- Filtros por Asesor u Oficial -->
+    <div class="card grid-4">
+        <div>
+            <label>👤 Asesor / Oficial (Columna T)</label>
+            <select id="filterOficial" onchange="applyFilters()">
+                <option value="TODOS">-- Todos los Asesores --</option>
+            </select>
+        </div>
+        <div>
+            <label>📅 Estado / Día</label>
+            <select id="filterEstado" onchange="applyFilters()">
+                <option value="TODOS">-- Ver Toda la Cartera --</option>
+                <option value="PAGAN_HOY">🗓️ SOCIOS QUE PAGAN HOY / COMPROMISOS</option>
+                <option value="CON_COMPROMISO">🤝 Con Compromiso Agendado</option>
+                <option value="EN_MORA">⚠️ En Mora (> 0 días)</option>
+                <option value="CANCELADO">✅ Créditos Cancelados / Saldo $0</option>
+            </select>
+        </div>
+        <div>
+            <label>⚡ Prioridad de Cobro</label>
+            <select id="sortBy" onchange="applyFilters()">
+                <option value="compromiso_asc">Fecha de Pago / Compromiso más Cercana</option>
+                <option value="mora_desc">Mayor Días de Mora</option>
+                <option value="saldo_desc">Mayor Saldo Vencido</option>
+                <option value="nombre_asc">Nombre del Socio (A-Z)</option>
+            </select>
+        </div>
+        <div>
+            <label>🔍 Buscar Socio / Cédula / Op.</label>
+            <input type="text" id="searchInput" placeholder="Escribe para buscar..." onkeyup="applyFilters()">
+        </div>
+    </div>
+
+    <!-- Lista de Socios -->
+    <div class="card">
+        <h2>Socios en Cartera (<span id="count">0</span>)</h2>
+        <div id="clientsList">Cargando base de datos compartida...</div>
+    </div>
+
+    <script>
+        // Enlace público CSV de Google Sheets
+        const SHEET_PUB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0sM7zNvYvD6Jamg3PEX19P6uwSSYtKDo-m3WbuuvAgOeQe8SFe4mT2oiAr0NeA19GAvgAu6KoffEI/pub?gid=50945204&single=true&output=csv';
+
+        // Configuración de base de datos remota de Firebase (Gratuito)
+        const firebaseConfig = {
+            databaseURL: "https://cooperativa-cobranzas-default-rtdb.firebaseio.com"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let credits = [];
+        let gestiones = {};
+        let compromisos = {};
+        let cobros = {};
+
+        // 1. Carga automática inicial al abrir la app
+        window.addEventListener('DOMContentLoaded', () => {
+            iniciarSincronizacionRemota();
+            cargarCarteraBaseGoogleSheets();
+        });
+
+        // 2. Escuchar cambios de todos los asesores en tiempo real
+        function iniciarSincronizacionRemota() {
+            db.ref('coop_gestiones').on('value', snapshot => {
+                gestiones = snapshot.val() || {};
+                applyFilters();
+            });
+
+            db.ref('coop_compromisos').on('value', snapshot => {
+                compromisos = snapshot.val() || {};
+                applyFilters();
+            });
+
+            db.ref('coop_cobros').on('value', snapshot => {
+                cobros = snapshot.val() || {};
+                applyFilters();
+            });
+        }
+
+        // 3. Lectura automática desde Google Sheets sin presionar botones
+        function cargarCarteraBaseGoogleSheets() {
+            Papa.parse(SHEET_PUB_URL, {
+                download: true,
+                header: false,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.data && results.data.length > 1) {
+                        procesarFilasDirectas(results.data);
+                    }
+                }
+            });
+        }
+
+        function procesarFilasDirectas(rows) {
+            const headers = rows[0].map(h => String(h).trim());
+            
+            let idxOficial = 19; // Columna T (Oficial)
+            const foundIdxOficial = headers.findIndex(h => h.toLowerCase() === 'oficial');
+            if (foundIdxOficial !== -1) idxOficial = foundIdxOficial;
+
+            const idxCedula = headers.findIndex(h => h.toLowerCase().includes('identifica'));
+            const idxNombre = headers.findIndex(h => h.toLowerCase() === 'nombre');
+            const idxOperacion = headers.findIndex(h => h.toLowerCase().includes('operac'));
+            const idxSaldo = headers.findIndex(h => h.toLowerCase() === 'saldo');
+            const idxMora = headers.findIndex(h => h.toLowerCase().includes('mora'));
+            const idxFechaPago = headers.findIndex(h => h.toLowerCase().includes('fecha_pago'));
+            const idxDireccion = headers.findIndex(h => h.toLowerCase().includes('direccioncliente'));
+            const idxTelefono = headers.findIndex(h => h.toLowerCase().includes('telefonocliente'));
+
+            const newCredits = [];
+
+            for (let i = 1; i < rows.length; i++) {
+                const r = rows[i];
+                if (!r || r.length <= idxNombre) continue;
+
+                const nombre = r[idxNombre !== -1 ? idxNombre : 3];
+                if (!nombre || nombre === 'Nombre') continue;
+
+                const cedula = r[idxCedula !== -1 ? idxCedula : 1] || '';
+                const operacion = r[idxOperacion !== -1 ? idxOperacion : 4] || '';
+                const rawSaldo = r[idxSaldo !== -1 ? idxSaldo : 10] || '0';
+                const cleanSaldo = parseFloat(String(rawSaldo).replace(/\./g, '').replace(',', '.'));
+                const diasMora = parseInt(r[idxMora !== -1 ? idxMora : 20] || '0');
+                
+                let oficialVal = r[idxOficial] ? String(r[idxOficial]).trim() : '';
+                if (!oficialVal || oficialVal === 'Oficial') oficialVal = 'SIN ASESOR';
+
+                const fechaPago = r[idxFechaPago !== -1 ? idxFechaPago : 23] || '';
+                const direccion = r[idxDireccion !== -1 ? idxDireccion : 50] || '';
+                const telefono = r[idxTelefono !== -1 ? idxTelefono : 51] || '';
+
+                const idClean = String(operacion || cedula || i).replace(/[^a-zA-Z0-9]/g, '');
+
+                // Calcular saldo ajustado por los cobros registrados colectivamente
+                let saldoActual = cleanSaldo;
+                if (cobros[idClean]) {
+                    const totalCobrado = cobros[idClean].reduce((acc, curr) => acc + curr.monto, 0);
+                    saldoActual = Math.max(0, cleanSaldo - totalCobrado);
+                }
+
+                newCredits.push({
+                    id: idClean,
+                    nombre: String(nombre).trim(),
+                    cedula: String(cedula).trim(),
+                    operacion: String(operacion).trim(),
+                    saldo: isNaN(saldoActual) ? 0 : saldoActual,
+                    diasMora: isNaN(diasMora) ? 0 : diasMora,
+                    telefono: String(telefono).trim(),
+                    oficial: oficialVal,
+                    direccion: String(direccion).trim(),
+                    fechaPago: String(fechaPago).trim()
+                });
+            }
+
+            credits = newCredits;
+            populateOficialesDropdown();
+            applyFilters();
+        }
+
+        // 4. Registro centralizado en la nube para sincronización multi-asesor
+        function registrarCobro(id) {
+            const item = credits.find(c => c.id === id);
+            if (!item) return;
+
+            const montoInput = prompt(`Saldo actual del socio: $${item.saldo.toFixed(2)}\n\nIngrese el monto recaudado ($):`, item.saldo.toFixed(2));
+            if (!montoInput) return;
+
+            const montoPago = parseFloat(montoInput.replace(',', '.'));
+            if (isNaN(montoPago) || montoPago <= 0) return;
+
+            const medioPago = prompt("Medio de pago:\n1 = Efectivo\n2 = Transferencia / Depósito\n3 = Cheque", "1");
+            let metodoTexto = "Efectivo";
+            if (medioPago === "2") metodoTexto = "Transferencia / Depósito";
+            if (medioPago === "3") metodoTexto = "Cheque";
+
+            const comprobante = prompt("Comprobante / Recibo (opcional):", "") || "N/A";
+            const fechaHora = new Date().toLocaleString('es-EC');
+
+            // Guardar en la nube para que se actualice en el celular de todos los asesores
+            const listaCobros = cobros[id] || [];
+            listaCobros.unshift({ fecha: fechaHora, monto: montoPago, metodo: metodoTexto, comprobante: comprobante });
+            db.ref(`coop_cobros/${id}`).set(listaCobros);
+
+            const listaGestiones = gestiones[id] || [];
+            listaGestiones.unshift({ fecha: fechaHora, nota: `💵 COBRO RECIBIDO: $${montoPago.toFixed(2)} (${metodoTexto}). Recibo: ${comprobante}` });
+            db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+
+            // Eliminar compromiso de pago cumplido
+            if (compromisos[id]) {
+                db.ref(`coop_compromisos/${id}`).remove();
+            }
+        }
+
+        function registrarCompromiso(id) {
+            const fechaCompromiso = prompt("Fecha pactada para el pago (AAAA-MM-DD):", new Date().toISOString().split('T')[0]);
+            if (!fechaCompromiso) return;
+
+            const montoCompromiso = prompt("Monto pactado a cancelar ($):");
+            if (!montoCompromiso) return;
+
+            const detalle = prompt("Observación del acuerdo:", "Pago en ventanilla");
+            const fechaHora = new Date().toLocaleString('es-EC');
+
+            db.ref(`coop_compromisos/${id}`).set({
+                fecha: fechaCompromiso,
+                monto: parseFloat(montoCompromiso.replace(',', '.')),
+                observacion: detalle || ''
+            });
+
+            const listaGestiones = gestiones[id] || [];
+            listaGestiones.unshift({ fecha: fechaHora, nota: `🤝 COMPROMISO PACTADO: $${montoCompromiso} para el ${fechaCompromiso}. Obs: ${detalle}` });
+            db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+        }
+
+        function registrarVisita(id) {
+            const result = prompt("Informe el resultado de la visita / gestión:");
+            if (!result) return;
+
+            const fechaHora = new Date().toLocaleString('es-EC');
+            const listaGestiones = gestiones[id] || [];
+            listaGestiones.unshift({ fecha: fechaHora, nota: result });
+            db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+        }
+
+        function populateOficialesDropdown() {
+            const dropdown = document.getElementById('filterOficial');
+            const currentVal = dropdown.value;
+            dropdown.innerHTML = '<option value="TODOS">-- Todos los Asesores --</option>';
+            
+            const oficiales = [...new Set(credits.map(c => c.oficial))].filter(o => o && o !== 'SIN ASESOR');
+            oficiales.sort().forEach(oficial => {
+                const opt = document.createElement('option');
+                opt.value = oficial;
+                opt.textContent = `Asesor: ${oficial}`;
+                dropdown.appendChild(opt);
+            });
+            dropdown.value = currentVal || 'TODOS';
+        }
+
+        function applyFilters() {
+            const oficialSelected = document.getElementById('filterOficial').value;
+            const estadoSelected = document.getElementById('filterEstado').value;
+            const sortBy = document.getElementById('sortBy').value;
+            const query = document.getElementById('searchInput').value.toLowerCase();
+
+            const hoyObj = new Date();
+            const hoyISO = hoyObj.toISOString().split('T')[0];
+            const hoyDiaNum = String(hoyObj.getDate()).padStart(2, '0');
+            const hoyStrLoc = hoyObj.toLocaleDateString('es-EC');
+
+            let result = credits.filter(c => {
+                const matchOficial = (oficialSelected === 'TODOS') || (c.oficial === oficialSelected);
+                const matchSearch = c.nombre.toLowerCase().includes(query) || 
+                                    c.cedula.includes(query) || 
+                                    c.operacion.toLowerCase().includes(query);
+                
+                let matchEstado = true;
+                if (estadoSelected === 'PAGAN_HOY') {
+                    const compHoy = compromisos[c.id] && compromisos[c.id].fecha === hoyISO;
+                    const fechaPagoDia = c.fechaPago && c.fechaPago.split('/')[0] === hoyDiaNum;
+                    matchEstado = compHoy || fechaPagoDia;
+                } else if (estadoSelected === 'CON_COMPROMISO') {
+                    matchEstado = !!compromisos[c.id];
+                } else if (estadoSelected === 'EN_MORA') {
+                    matchEstado = c.diasMora > 0 && c.saldo > 0;
+                } else if (estadoSelected === 'CANCELADO') {
+                    matchEstado = c.saldo === 0;
+                }
+
+                return matchOficial && matchSearch && matchEstado;
+            });
+
+            const totalSaldo = result.reduce((acc, curr) => acc + curr.saldo, 0);
+            const paganHoyCount = result.filter(c => {
+                const compHoy = compromisos[c.id] && compromisos[c.id].fecha === hoyISO;
+                const fechaPagoDia = c.fechaPago && c.fechaPago.split('/')[0] === hoyDiaNum;
+                return compHoy || fechaPagoDia;
+            }).length;
+
+            let totalRecaudadoHoy = 0;
+            Object.keys(cobros).forEach(id => {
+                const socio = credits.find(c => c.id === id);
+                if (socio && (oficialSelected === 'TODOS' || socio.oficial === oficialSelected)) {
+                    cobros[id].forEach(cb => {
+                        if (cb.fecha.includes(hoyStrLoc) || cb.fecha.includes(hoyISO)) {
+                            totalRecaudadoHoy += cb.monto;
+                        }
+                    });
+                }
+            });
+
+            document.getElementById('kpiTotal').innerText = result.length;
+            document.getElementById('kpiSaldo').innerText = '$' + totalSaldo.toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('kpiHoy').innerText = paganHoyCount;
+            document.getElementById('kpiRecaudado').innerText = '$' + totalRecaudadoHoy.toLocaleString('en-US', {minimumFractionDigits: 2});
+
+            render(result);
+        }
+
+        function render(data) {
+            const clientsList = document.getElementById('clientsList');
+            document.getElementById('count').innerText = data.length;
+            clientsList.innerHTML = '';
+
+            if (data.length === 0) {
+                clientsList.innerHTML = '<p style="color: #64748b;">No hay socios registrados.</p>';
+                return;
+            }
+
+            const hoyISO = new Date().toISOString().split('T')[0];
+
+            data.slice(0, 100).forEach(item => {
+                const div = document.createElement('div');
+                let cardClass = item.saldo === 0 ? 'cancelado' : (item.diasMora > 30 ? 'mora-alta' : (item.diasMora > 0 ? 'mora-media' : 'al-dia'));
+                let estadoTexto = item.saldo === 0 ? '✅ CANCELADO / $0' : (item.diasMora > 0 ? `🚨 MORA (${item.diasMora} DÍAS)` : 'AL DÍA');
+                let badgeClass = item.saldo === 0 ? 'badge-teal' : (item.diasMora > 30 ? 'badge-danger' : (item.diasMora > 0 ? 'badge-warning' : 'badge-success'));
+
+                div.className = `client-card ${cardClass}`;
+
+                const comp = compromisos[item.id];
+                let htmlCompromiso = '';
+                if (comp && item.saldo > 0) {
+                    let alertStyle = 'compromiso-alert' + (comp.fecha === hoyISO ? ' compromiso-hoy' : (comp.fecha < hoyISO ? ' compromiso-vencido' : ''));
+                    htmlCompromiso = `
+                        <div class="${alertStyle}">
+                            🤝 COMPROMISO DE PAGO: $${comp.monto.toFixed(2)} para el ${comp.fecha}
+                            <br><small style="font-weight:normal;">Obs: ${comp.observacion}</small>
+                        </div>
+                    `;
+                }
+
+                const listaVisitas = gestiones[item.id] || [];
+                let htmlVisitas = listaVisitas.length > 0 ? `
+                    <div class="historial-box">
+                        <strong>📌 Bitácora Compartida de la Agencia (${listaVisitas.length}):</strong>
+                        ${listaVisitas.map(v => `<div class="visita-item"><small><b>[${v.fecha}]:</b> ${v.nota}</small></div>`).join('')}
+                    </div>
+                ` : '';
+
+                div.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <strong>${item.nombre}</strong>
+                        <div>
+                            ${comp && item.saldo > 0 ? '<span class="badge badge-indigo">CON COMPROMISO</span> ' : ''}
+                            <span class="badge ${badgeClass}">${estadoTexto}</span>
+                        </div>
+                    </div>
+                    <p style="margin: 4px 0; font-size: 0.85rem;">🆔 Cédula: <b>${item.cedula}</b> | Op: <b>${item.operacion}</b> | Asesor: <b>${item.oficial}</b></p>
+                    <p style="margin: 4px 0; font-size: 0.85rem;">📍 Dirección: ${item.direccion || 'Sin registro'}</p>
+                    <p style="margin: 4px 0; font-size: 0.85rem;">📱 Teléfono: ${item.telefono || 'Sin registro'} | Fecha Pago: ${item.fechaPago || 'N/A'}</p>
+                    <p style="margin: 4px 0; font-size: 0.95rem;">💰 Saldo Pendiente: <strong>$${item.saldo.toFixed(2)}</strong></p>
+                    ${htmlCompromiso}
+                    <div style="margin-top: 8px;">
+                        <button class="btn-small btn-teal" onclick="registrarCobro('${item.id}')">💵 Registrar Cobro</button>
+                        <button class="btn-small btn-indigo" onclick="registrarCompromiso('${item.id}')">🤝 Compromiso</button>
+                        <button class="btn-small btn-purple" onclick="registrarVisita('${item.id}')">📝 Registrar Visita</button>
+                    </div>
+                    ${htmlVisitas}
+                `;
+                clientsList.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
