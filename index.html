@@ -58,7 +58,7 @@
         .badge-indigo { background-color: var(--indigo); }
         .badge-teal { background-color: var(--teal); }
         
-        .btn-small { padding: 6px 10px; font-size: 0.85rem; width: auto; display: inline-block; margin-top: 6px; margin-right: 4px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: 600; }
+        .btn-small { padding: 6px 10px; font-size: 0.85rem; width: auto; display: inline-block; margin-top: 6px; margin-right: 4px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: 600; text-decoration: none; }
         .btn-success { background-color: var(--success); }
         .btn-indigo { background-color: var(--indigo); }
         .btn-purple { background-color: var(--purple); }
@@ -184,7 +184,7 @@
             });
         }
 
-        // 3. Lectura automática desde Google Sheets sin presionar botones
+        // 3. Lectura automática desde Google Sheets
         function cargarCarteraBaseGoogleSheets() {
             Papa.parse(SHEET_PUB_URL, {
                 download: true,
@@ -238,7 +238,6 @@
 
                 const idClean = String(operacion || cedula || i).replace(/[^a-zA-Z0-9]/g, '');
 
-                // Calcular saldo ajustado por los cobros registrados colectivamente en Firebase
                 let saldoActual = cleanSaldo;
                 if (cobros[idClean]) {
                     const totalCobrado = cobros[idClean].reduce((acc, curr) => acc + curr.monto, 0);
@@ -264,7 +263,37 @@
             applyFilters();
         }
 
-        // 4. Registro centralizado en la nube para sincronización multi-asesor
+        // Abrir ubicación en Google Maps
+        function abrirGoogleMaps(direccion) {
+            if (!direccion || direccion.trim() === '') {
+                alert('El socio no tiene una dirección registrada.');
+                return;
+            }
+            const query = encodeURIComponent(direccion + ', Imbabura, Ecuador');
+            window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+        }
+
+        // Enviar WhatsApp al socio
+        function enviarWhatsApp(id) {
+            const item = credits.find(c => c.id === id);
+            if (!item) return;
+
+            const comp = compromisos[id];
+            let mensaje = `Estimado(a) ${item.nombre}, le saludamos de la Cooperativa. Le recordamos mantener al día su crédito N° ${item.operacion}. Saldo pendiente: $${item.saldo.toFixed(2)}.`;
+            
+            if (comp) {
+                mensaje = `Estimado(a) ${item.nombre}, le recordamos su COMPROMISO DE PAGO pactado para el ${comp.fecha} por el valor de $${comp.monto.toFixed(2)} de su crédito N° ${item.operacion}.`;
+            } else if (item.diasMora > 0) {
+                mensaje = `Estimado(a) ${item.nombre}, su crédito N° ${item.operacion} registra ${item.diasMora} días de mora por $${item.saldo.toFixed(2)}. Le solicitamos regularizar su cuenta hoy.`;
+            }
+
+            let phoneClean = item.telefono.replace(/[^0-9]/g, '');
+            if (phoneClean.startsWith('0')) phoneClean = '593' + phoneClean.substring(1);
+
+            window.open(`https://wa.me/${phoneClean}?text=${encodeURIComponent(mensaje)}`, '_blank');
+        }
+
+        // Registrar cobro y sincronizar con Firebase
         function registrarCobro(id) {
             const item = credits.find(c => c.id === id);
             if (!item) return;
@@ -283,7 +312,6 @@
             const comprobante = prompt("Comprobante / Recibo (opcional):", "") || "N/A";
             const fechaHora = new Date().toLocaleString('es-EC');
 
-            // Guardar en la nube (se actualiza automáticamente para todos los oficiales)
             const listaCobros = cobros[id] || [];
             listaCobros.unshift({ fecha: fechaHora, monto: montoPago, metodo: metodoTexto, comprobante: comprobante });
             db.ref(`coop_cobros/${id}`).set(listaCobros);
@@ -292,12 +320,12 @@
             listaGestiones.unshift({ fecha: fechaHora, nota: `💵 COBRO RECIBIDO: $${montoPago.toFixed(2)} (${metodoTexto}). Recibo: ${comprobante}` });
             db.ref(`coop_gestiones/${id}`).set(listaGestiones);
 
-            // Eliminar compromiso de pago cumplido
             if (compromisos[id]) {
                 db.ref(`coop_compromisos/${id}`).remove();
             }
         }
 
+        // Registrar compromiso y sincronizar
         function registrarCompromiso(id) {
             const fechaCompromiso = prompt("Fecha pactada para el pago (AAAA-MM-DD):", new Date().toISOString().split('T')[0]);
             if (!fechaCompromiso) return;
@@ -319,14 +347,39 @@
             db.ref(`coop_gestiones/${id}`).set(listaGestiones);
         }
 
+        // Registrar Visita capturando la Ubicación GPS en tiempo real
         function registrarVisita(id) {
-            const result = prompt("Informe el resultado de la visita / gestión:");
+            const result = prompt("Informe el resultado de la visita en campo:");
             if (!result) return;
 
             const fechaHora = new Date().toLocaleString('es-EC');
             const listaGestiones = gestiones[id] || [];
-            listaGestiones.unshift({ fecha: fechaHora, nota: result });
-            db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+                        
+                        const notaConGps = `${result} | 📍 GPS: <a href="${mapsUrl}" target="_blank">Ver Punto de Visita (${lat.toFixed(5)}, ${lng.toFixed(5)})</a>`;
+                        
+                        listaGestiones.unshift({ fecha: fechaHora, nota: notaConGps });
+                        db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+                        alert("Visita registrada con ubicación GPS capturada.");
+                    },
+                    (error) => {
+                        console.warn("No se pudo obtener el GPS:", error.message);
+                        listaGestiones.unshift({ fecha: fechaHora, nota: result });
+                        db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+                        alert("Visita registrada sin GPS.");
+                    },
+                    { enableHighAccuracy: true, timeout: 8000 }
+                );
+            } else {
+                listaGestiones.unshift({ fecha: fechaHora, nota: result });
+                db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+            }
         }
 
         function populateOficialesDropdown() {
@@ -459,8 +512,10 @@
                     ${htmlCompromiso}
                     <div style="margin-top: 8px;">
                         <button class="btn-small btn-teal" onclick="registrarCobro('${item.id}')">💵 Registrar Cobro</button>
+                        <button class="btn-small btn-success" onclick="enviarWhatsApp('${item.id}')">📲 WhatsApp</button>
+                        <button class="btn-small btn-warning" onclick="abrirGoogleMaps('${item.direccion.replace(/'/g, "\\'")}')">🗺️ Maps</button>
                         <button class="btn-small btn-indigo" onclick="registrarCompromiso('${item.id}')">🤝 Compromiso</button>
-                        <button class="btn-small btn-purple" onclick="registrarVisita('${item.id}')">📝 Registrar Visita</button>
+                        <button class="btn-small btn-purple" onclick="registrarVisita('${item.id}')">📍 Visita GPS</button>
                     </div>
                     ${htmlVisitas}
                 `;
