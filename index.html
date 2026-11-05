@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema Colaborativo de Cobranzas y Campo</title>
-    <!-- PapaParse para la lectura automática de Google Sheets -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <!-- SDK de Firebase Database y Authentication -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -186,7 +184,9 @@
     </div>
 
     <script>
-        const SHEET_PUB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0sM7zNvYvD6Jamg3PEX19P6uwSSYtKDo-m3WbuuvAgOeQe8SFe4mT2oiAr0NeA19GAvgAu6KoffEI/pub?gid=50945204&single=true&output=csv';
+        // URL de tu Apps Script Proxy y Token Secreto de Seguridad
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxdQkSB6p4AiVIQv9HtbLy6DFNdbe_hU-VkY7d0u9OTfR3qA4GCgKclUplDk1uvdaPs/exec';
+        const SECRET_TOKEN = 'ECUACREDITOS_AGENCIA_IBARRA_2026_SECURE_KEY';
 
         const firebaseConfig = {
             apiKey: "AIzaSyA0ozR5CVjVkZk43frHrKwaXj0NzXfBaks",
@@ -286,16 +286,21 @@
         }
 
         function cargarCarteraBaseGoogleSheets() {
-            Papa.parse(SHEET_PUB_URL, {
-                download: true,
-                header: false,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    if (results.data && results.data.length > 1) {
-                        procesarFilasDirectas(results.data);
+            const urlConToken = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}`;
+
+            fetch(urlConToken)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.status === "success" && result.data && result.data.length > 1) {
+                        procesarFilasDirectas(result.data);
+                    } else {
+                        console.error("Error de acceso:", result.message);
+                        alert("❌ No se pudo autenticar la lectura de la cartera base.");
                     }
-                }
-            });
+                })
+                .catch(err => {
+                    console.error("Error conectando con el proxy de Google Sheets:", err);
+                });
         }
 
         function procesarFilasDirectas(rows) {
@@ -308,7 +313,7 @@
             const idxCedula = headers.findIndex(h => h.toLowerCase().includes('identifica'));
             const idxNombre = headers.findIndex(h => h.toLowerCase() === 'nombre');
             const idxOperacion = headers.findIndex(h => h.toLowerCase().includes('operac'));
-            const idxSaldo = headers.findIndex(h => h.toLowerCase() === 'saldo');
+            const idxSaldo = headers.findIndex(h => h.toLowerCase().includes('saldo'));
             const idxMora = headers.findIndex(h => h.toLowerCase().includes('mora'));
             const idxFechaPago = headers.findIndex(h => h.toLowerCase().includes('fecha_pago'));
             const idxDireccion = headers.findIndex(h => h.toLowerCase().includes('direccioncliente'));
@@ -450,7 +455,7 @@
                 return;
             }
 
-            //alert("📡 Obteniendo ubicación GPS... Por favor permite el acceso a la ubicación si tu teléfono lo solicita.");
+            alert("📡 Obteniendo ubicación GPS... Por favor permite el acceso a la ubicación si tu teléfono lo solicita.");
 
             navigator.geolocation.getCurrentPosition(
                 (position) => {
