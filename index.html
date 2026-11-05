@@ -443,93 +443,104 @@
             applyFilters();
         }
 
-        // CONSULTA DE TABLA DE AMORTIZACIÓN A TRAVÉS DE GOOGLE APPS SCRIPT (EVITA CORS)
-        async function consultarTablaAmortizacion(numPrestamo, nombreSocio) {
-            const modal = document.getElementById('modalAmortizacion');
-            const title = document.getElementById('modalTitle');
-            const loading = document.getElementById('modalLoading');
-            const errorDiv = document.getElementById('modalError');
-            const container = document.getElementById('modalTableContainer');
+        // CONSULTA DE TABLA DE AMORTIZACIÓN A TRAVÉS DE GOOGLE APPS SCRIPT
+async function consultarTablaAmortizacion(numPrestamo, nombreSocio) {
+    const modal = document.getElementById('modalAmortizacion');
+    const title = document.getElementById('modalTitle');
+    const loading = document.getElementById('modalLoading');
+    const errorDiv = document.getElementById('modalError');
+    const container = document.getElementById('modalTableContainer');
 
-            title.innerText = `📋 Tabla de Amortización - Op: ${numPrestamo}`;
-            loading.style.display = 'block';
-            errorDiv.style.display = 'none';
-            container.innerHTML = '';
-            modal.style.display = 'flex';
+    title.innerText = `📋 Tabla de Amortización - Op: ${numPrestamo}`;
+    loading.style.display = 'block';
+    errorDiv.style.display = 'none';
+    container.innerHTML = '';
+    modal.style.display = 'flex';
 
-            try {
-                const response = await fetch(APPS_SCRIPT_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: "consultaAmortizacion",
-                        numeroprestamo: String(numPrestamo).trim()
-                    })
-                });
+    try {
+        const response = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: "consultaAmortizacion",
+                numeroprestamo: String(numPrestamo).trim()
+            })
+        });
 
-                if (!response.ok) {
-                    throw new Error(`Error en el servicio puente (${response.status})`);
-                }
-
-                const data = await response.json();
-                loading.style.display = 'none';
-
-                let listaCuotas = Array.isArray(data) ? data : (data.tabla || data.cuotas || data.data || []);
-                
-                if (listaCuotas.length === 0) {
-                    container.innerHTML = `<p style="text-align:center; color:#64748b;">No se encontraron cuotas para la operación N° ${numPrestamo}.</p>`;
-                    return;
-                }
-
-                let html = `
-                    <p style="margin-bottom: 8px;"><b>Socio:</b> ${nombreSocio}</p>
-                    <table class="amort-table">
-                        <thead>
-                            <tr>
-                                <th># Cuota</th>
-                                <th>Vencimiento</th>
-                                <th>Capital ($)</th>
-                                <th>Interés ($)</th>
-                                <th>Rubros / Seg. ($)</th>
-                                <th>Valor Cuota ($)</th>
-                                <th>Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-
-                listaCuotas.forEach(c => {
-                    const numCuota = c.cuota || c.numero_cuota || c.numerocuota || '-';
-                    const fechaVenc = c.fecha_vencimiento || c.fechavencimiento || c.fecha || '-';
-                    const capital = parseFloat(c.capital || c.valor_capital || 0).toFixed(2);
-                    const interes = parseFloat(c.interes || c.valor_interes || 0).toFixed(2);
-                    const rubros = parseFloat(c.rubros || c.seguro || c.otros || 0).toFixed(2);
-                    const totalCuota = parseFloat(c.valor_cuota || c.total || c.monto || (parseFloat(capital)+parseFloat(interes)+parseFloat(rubros))).toFixed(2);
-                    const estado = c.estado || c.estado_cuota || 'PENDIENTE';
-
-                    html += `
-                        <tr>
-                            <td><b>${numCuota}</b></td>
-                            <td>${fechaVenc}</td>
-                            <td>$${capital}</td>
-                            <td>$${interes}</td>
-                            <td>$${rubros}</td>
-                            <td><strong>$${totalCuota}</strong></td>
-                            <td><span class="badge ${estado.toUpperCase() === 'PAGADO' ? 'badge-success' : 'badge-danger'}">${estado}</span></td>
-                        </tr>
-                    `;
-                });
-
-                html += `</tbody></table>`;
-                container.innerHTML = html;
-
-            } catch (err) {
-                console.error("Error al consultar amortización:", err);
-                loading.style.display = 'none';
-                errorDiv.innerText = `❌ No se pudo consultar la tabla de amortización: ${err.message}. Verifique el servicio de Ngrok.`;
-                errorDiv.style.display = 'block';
-            }
+        if (!response.ok) {
+            throw new Error(`Error en el servicio puente (${response.status})`);
         }
 
+        const data = await response.json();
+        loading.style.display = 'none';
+
+        // Tu API devuelve directamente un Array de objetos
+        let listaCuotas = Array.isArray(data) ? data : (data.tabla || data.cuotas || data.data || []);
+        
+        if (listaCuotas.length === 0) {
+            container.innerHTML = `<p style="text-align:center; color:#64748b;">No se encontraron cuotas para la operación N° ${numPrestamo}.</p>`;
+            return;
+        }
+
+        let html = `
+            <p style="margin-bottom: 8px;"><b>Socio:</b> ${nombreSocio}</p>
+            <table class="amort-table">
+                <thead>
+                    <tr>
+                        <th># Cuota</th>
+                        <th>Vencimiento</th>
+                        <th>Capital ($)</th>
+                        <th>Interés ($)</th>
+                        <th>Otros / Seg. ($)</th>
+                        <th>Valor Cuota ($)</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        listaCuotas.forEach(c => {
+            // Mapeo exacto con las llaves que devuelve ORION/Express en Postman
+            const numCuota = c.Cuota !== undefined ? c.Cuota : (c.cuota || '-');
+            
+            // Formatear la fecha ISO (ej: "2026-11-15T00:00:00.000Z" -> "2026-11-15")
+            let fechaVenc = c.Fecha || c.fecha_vencimiento || '-';
+            if (typeof fechaVenc === 'string' && fechaVenc.includes('T')) {
+                fechaVenc = fechaVenc.split('T')[0];
+            }
+
+            const capital = parseFloat(c.Capital || 0).toFixed(2);
+            const interes = parseFloat(c.Interes || 0).toFixed(2);
+            const otros = parseFloat(c.Otros_x_V || c.Otros_Venc || c.rubros || 0).toFixed(2);
+            
+            // Calcular el total de la cuota si la propiedad viene vacía o con espacio
+            const totalCuotaVal = c["TOTAL CUOTA"] || c.Total || c.total;
+            const totalCuota = totalCuotaVal ? parseFloat(totalCuotaVal).toFixed(2) : (parseFloat(capital) + parseFloat(interes) + parseFloat(otros)).toFixed(2);
+            
+            const estadoRaw = String(c.Estado || 'PENDIENTE').trim();
+
+            html += `
+                <tr>
+                    <td><b>${numCuota}</b></td>
+                    <td>${fechaVenc}</td>
+                    <td>$${capital}</td>
+                    <td>$${interes}</td>
+                    <td>$${otros}</td>
+                    <td><strong>$${totalCuota}</strong></td>
+                    <td><span class="badge ${estadoRaw.toUpperCase() === 'PAGADO' ? 'badge-success' : 'badge-danger'}">${estadoRaw}</span></td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+
+    } catch (err) {
+        console.error("Error al consultar amortización:", err);
+        loading.style.display = 'none';
+        errorDiv.innerText = `❌ No se pudo consultar la tabla de amortización: ${err.message}. Verifique el servicio de Ngrok.`;
+        errorDiv.style.display = 'block';
+    }
+}
         function cerrarModalAmortizacion() {
             document.getElementById('modalAmortizacion').style.display = 'none';
         }
