@@ -262,7 +262,6 @@
         // Configuración de URLs y Tokens
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxdQkSB6p4AiVIQv9HtbLy6DFNdbe_hU-VkY7d0u9OTfR3qA4GCgKclUplDk1uvdaPs/exec';
         const SECRET_TOKEN = 'ECUACREDITOS_AGENCIA_IBARRA_2026_SECURE_KEY';
-        const API_AMORTIZACION_URL = 'https://fine-firmly-griffon.ngrok-free.app/consultaTablaAmortizacion';
 
         const firebaseConfig = {
             apiKey: "AIzaSyA0ozR5CVjVkZk43frHrKwaXj0NzXfBaks",
@@ -444,7 +443,7 @@
             applyFilters();
         }
 
-        // CONSULTA DE TABLA DE AMORTIZACIÓN VÍA POST API
+        // CONSULTA DE TABLA DE AMORTIZACIÓN A TRAVÉS DE GOOGLE APPS SCRIPT (EVITA CORS)
         async function consultarTablaAmortizacion(numPrestamo, nombreSocio) {
             const modal = document.getElementById('modalAmortizacion');
             const title = document.getElementById('modalTitle');
@@ -459,20 +458,16 @@
             modal.style.display = 'flex';
 
             try {
-                const response = await fetch(API_AMORTIZACION_URL, {
+                const response = await fetch(APPS_SCRIPT_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'ngrok-skip-browser-warning': '69420',
-                        'Accept': 'application/json'
-                    },
                     body: JSON.stringify({
+                        action: "consultaAmortizacion",
                         numeroprestamo: String(numPrestamo).trim()
                     })
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Error en la API (${response.status})`);
+                    throw new Error(`Error en el servicio puente (${response.status})`);
                 }
 
                 const data = await response.json();
@@ -530,7 +525,7 @@
             } catch (err) {
                 console.error("Error al consultar amortización:", err);
                 loading.style.display = 'none';
-                errorDiv.innerText = `❌ No se pudo consultar la tabla de amortización: ${err.message}. Verifique que el servicio ngrok esté encendido.`;
+                errorDiv.innerText = `❌ No se pudo consultar la tabla de amortización: ${err.message}. Verifique el servicio de Ngrok.`;
                 errorDiv.style.display = 'block';
             }
         }
