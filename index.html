@@ -22,6 +22,7 @@
             --purple: #8b5cf6;
             --indigo: #4f46e5;
             --teal: #0d9488;
+            --cyan: #06b6d4;
         }
 
         body {
@@ -75,8 +76,8 @@
         .btn-success { background-color: var(--success); }
         .btn-indigo { background-color: var(--indigo); }
         .btn-purple { background-color: var(--purple); }
-        .btn-emerald { background-color: var(--emerald); }
         .btn-teal { background-color: var(--teal); }
+        .btn-cyan { background-color: var(--cyan); }
         .btn-warning { background-color: var(--warning); color: #000; }
         .btn-logout { background-color: #64748b; padding: 4px 10px; font-size: 0.8rem; width: auto; }
 
@@ -92,6 +93,63 @@
         .kpi-title { font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; }
         .kpi-value { font-size: 1.1rem; font-weight: bold; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.85rem; }
+
+        /* Estilos del Modal para Tabla de Amortización */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            max-width: 850px;
+            width: 100%;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .modal-header {
+            padding: 14px 18px;
+            background: #0f172a;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; }
+        .close-btn { background: none; border: none; color: white; font-size: 1.4rem; cursor: pointer; width: auto; padding: 0 6px; }
+        .modal-body {
+            padding: 16px;
+            overflow-y: auto;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table.amort-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        table.amort-table th, table.amort-table td {
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+        }
+        table.amort-table th {
+            background-color: #f1f5f9;
+            color: #334155;
+            font-weight: 700;
+        }
+        table.amort-table tr:nth-child(even) { background-color: #f8fafc; }
     </style>
 </head>
 <body>
@@ -183,10 +241,28 @@
         </div>
     </div>
 
+    <!-- Modal para Tabla de Amortización -->
+    <div id="modalAmortizacion" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">📋 Tabla de Amortización</h3>
+                <button class="close-btn" onclick="cerrarModalAmortizacion()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modalLoading" style="text-align: center; padding: 20px; font-weight: bold; color: var(--primary);">
+                    📡 Consultando API de la Cooperativa...
+                </div>
+                <div id="modalError" class="error-msg" style="margin-bottom: 12px;"></div>
+                <div id="modalTableContainer" class="table-container"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // URL de tu Apps Script Proxy y Token Secreto de Seguridad
+        // URL del Apps Script y API de Amortización
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxdQkSB6p4AiVIQv9HtbLy6DFNdbe_hU-VkY7d0u9OTfR3qA4GCgKclUplDk1uvdaPs/exec';
         const SECRET_TOKEN = 'ECUACREDITOS_AGENCIA_IBARRA_2026_SECURE_KEY';
+        const API_AMORTIZACION_URL = 'https://fine-firmly-griffon.ngrok-free.app/consultaTablaAmortizacion';
 
         const firebaseConfig = {
             apiKey: "AIzaSyA0ozR5CVjVkZk43frHrKwaXj0NzXfBaks",
@@ -366,6 +442,102 @@
             credits = newCredits;
             populateOficialesDropdown();
             applyFilters();
+        }
+
+        // CONSULTA DE TABLA DE AMORTIZACIÓN VÍA POST API
+        async function consultarTablaAmortizacion(numPrestamo, nombreSocio) {
+            const modal = document.getElementById('modalAmortizacion');
+            const title = document.getElementById('modalTitle');
+            const loading = document.getElementById('modalLoading');
+            const errorDiv = document.getElementById('modalError');
+            const container = document.getElementById('modalTableContainer');
+
+            title.innerText = `📋 Tabla de Amortización - Op: ${numPrestamo}`;
+            loading.style.display = 'block';
+            errorDiv.style.display = 'none';
+            container.innerHTML = '';
+            modal.style.display = 'flex';
+
+            try {
+                const response = await fetch(API_AMORTIZACION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true' // Evita la pantalla intermedia de aviso ngrok
+                    },
+                    body: JSON.stringify({
+                        numeroprestamo: String(numPrestamo).trim()
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error en el servidor API (${response.status})`);
+                }
+
+                const data = await response.json();
+                loading.style.display = 'none';
+
+                // Normalizar respuesta si viene dentro de una propiedad o array
+                let listaCuotas = Array.isArray(data) ? data : (data.tabla || data.cuotas || data.data || []);
+                
+                if (listaCuotas.length === 0) {
+                    container.innerHTML = `<p style="text-align:center; color:#64748b;">No se encontraron cuotas para la operación N° ${numPrestamo}.</p>`;
+                    return;
+                }
+
+                // Generar tabla HTML dinámicamente
+                let html = `
+                    <p style="margin-bottom: 8px;"><b>Socio:</b> ${nombreSocio}</p>
+                    <table class="amort-table">
+                        <thead>
+                            <tr>
+                                <th># Cuota</th>
+                                <th>Vencimiento</th>
+                                <th>Capital ($)</th>
+                                <th>Interés ($)</th>
+                                <th>Rubros / Seg. ($)</th>
+                                <th>Valor Cuota ($)</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                listaCuotas.forEach(c => {
+                    const numCuota = c.cuota || c.numero_cuota || c.numerocuota || '-';
+                    const fechaVenc = c.fecha_vencimiento || c.fechavencimiento || c.fecha || '-';
+                    const capital = parseFloat(c.capital || c.valor_capital || 0).toFixed(2);
+                    const interes = parseFloat(c.interes || c.valor_interes || 0).toFixed(2);
+                    const rubros = parseFloat(c.rubros || c.seguro || c.otros || 0).toFixed(2);
+                    const totalCuota = parseFloat(c.valor_cuota || c.total || c.monto || (parseFloat(capital)+parseFloat(interes)+parseFloat(rubros))).toFixed(2);
+                    const estado = c.estado || c.estado_cuota || 'PENDIENTE';
+
+                    html += `
+                        <tr>
+                            <td><b>${numCuota}</b></td>
+                            <td>${fechaVenc}</td>
+                            <td>$${capital}</td>
+                            <td>$${interes}</td>
+                            <td>$${rubros}</td>
+                            <td><strong>$${totalCuota}</strong></td>
+                            <td><span class="badge ${estado.toUpperCase() === 'PAGADO' ? 'badge-success' : 'badge-danger'}">${estado}</span></td>
+                        </tr>
+                    `;
+                });
+
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+
+            } catch (err) {
+                console.error("Error al consultar amortización:", err);
+                loading.style.display = 'none';
+                errorDiv.innerText = `❌ No se pudo consultar la tabla de amortización: ${err.message}`;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function cerrarModalAmortizacion() {
+            document.getElementById('modalAmortizacion').style.display = 'none';
         }
 
         function abrirGoogleMaps(direccion) {
@@ -626,6 +798,7 @@
                         <button class="btn-small btn-warning" onclick="abrirGoogleMaps('${item.direccion.replace(/'/g, "\\'")}')">🗺️ Maps</button>
                         <button class="btn-small btn-indigo" onclick="registrarCompromiso('${item.id}')">🤝 Compromiso</button>
                         <button class="btn-small btn-purple" onclick="registrarVisita('${item.id}')">📍 Visita GPS</button>
+                        <button class="btn-small btn-cyan" onclick="consultarTablaAmortizacion('${item.operacion}', '${item.nombre.replace(/'/g, "\\'")}')">📋 Tabla Amortización</button>
                     </div>
                     ${htmlVisitas}
                 `;
