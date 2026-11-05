@@ -379,69 +379,82 @@
         }
 
         function procesarFilasDirectas(rows) {
-            const headers = rows[0].map(h => String(h).trim());
-            
-            let idxOficial = 19;
-            const foundIdxOficial = headers.findIndex(h => h.toLowerCase() === 'oficial');
-            if (foundIdxOficial !== -1) idxOficial = foundIdxOficial;
+    const headers = rows[0].map(h => String(h).trim());
+    
+    let idxOficial = 19;
+    const foundIdxOficial = headers.findIndex(h => h.toLowerCase() === 'oficial');
+    if (foundIdxOficial !== -1) idxOficial = foundIdxOficial;
 
-            const idxCedula = headers.findIndex(h => h.toLowerCase().includes('identifica'));
-            const idxNombre = headers.findIndex(h => h.toLowerCase() === 'nombre');
-            const idxOperacion = headers.findIndex(h => h.toLowerCase().includes('operac'));
-            const idxSaldo = headers.findIndex(h => h.toLowerCase().includes('saldo'));
-            const idxMora = headers.findIndex(h => h.toLowerCase().includes('mora'));
-            const idxFechaPago = headers.findIndex(h => h.toLowerCase().includes('fecha_pago'));
-            const idxDireccion = headers.findIndex(h => h.toLowerCase().includes('direccioncliente'));
-            const idxTelefono = headers.findIndex(h => h.toLowerCase().includes('telefonocliente'));
+    const idxCedula = headers.findIndex(h => h.toLowerCase().includes('identifica'));
+    const idxNombre = headers.findIndex(h => h.toLowerCase() === 'nombre');
+    const idxOperacion = headers.findIndex(h => h.toLowerCase().includes('operac'));
+    const idxSaldo = headers.findIndex(h => h.toLowerCase().includes('saldo'));
+    const idxMora = headers.findIndex(h => h.toLowerCase().includes('mora'));
+    const idxFechaPago = headers.findIndex(h => h.toLowerCase().includes('fecha_pago'));
+    const idxDireccion = headers.findIndex(h => h.toLowerCase().includes('direccioncliente'));
+    const idxTelefono = headers.findIndex(h => h.toLowerCase().includes('telefonocliente'));
 
-            const newCredits = [];
+    const newCredits = [];
 
-            for (let i = 1; i < rows.length; i++) {
-                const r = rows[i];
-                if (!r || r.length <= idxNombre) continue;
+    for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r || r.length <= idxNombre) continue;
 
-                const nombre = r[idxNombre !== -1 ? idxNombre : 3];
-                if (!nombre || nombre === 'Nombre') continue;
+        const nombre = r[idxNombre !== -1 ? idxNombre : 3];
+        if (!nombre || nombre === 'Nombre') continue;
 
-                const cedula = r[idxCedula !== -1 ? idxCedula : 1] || '';
-                const operacion = r[idxOperacion !== -1 ? idxOperacion : 4] || '';
-                const rawSaldo = r[idxSaldo !== -1 ? idxSaldo : 10] || '0';
-                const cleanSaldo = parseFloat(String(rawSaldo).replace(/\./g, '').replace(',', '.'));
-                const diasMora = parseInt(r[idxMora !== -1 ? idxMora : 20] || '0');
-                
-                let oficialVal = r[idxOficial] ? String(r[idxOficial]).trim() : '';
-                if (!oficialVal || oficialVal === 'Oficial') oficialVal = 'SIN ASESOR';
+        const cedula = r[idxCedula !== -1 ? idxCedula : 1] || '';
+        const operacion = r[idxOperacion !== -1 ? idxOperacion : 4] || '';
+        const rawSaldo = r[idxSaldo !== -1 ? idxSaldo : 10] || '0';
+        const cleanSaldo = parseFloat(String(rawSaldo).replace(/\./g, '').replace(',', '.'));
+        const diasMora = parseInt(r[idxMora !== -1 ? idxMora : 20] || '0');
+        
+        let oficialVal = r[idxOficial] ? String(r[idxOficial]).trim() : '';
+        if (!oficialVal || oficialVal === 'Oficial') oficialVal = 'SIN ASESOR';
 
-                const fechaPago = r[idxFechaPago !== -1 ? idxFechaPago : 23] || '';
-                const direccion = r[idxDireccion !== -1 ? idxDireccion : 50] || '';
-                const telefono = r[idxTelefono !== -1 ? idxTelefono : 51] || '';
+        // --- FORMATEO DE FECHA DE PAGO ---
+        let rawFechaPago = r[idxFechaPago !== -1 ? idxFechaPago : 23] ? String(r[idxFechaPago !== -1 ? idxFechaPago : 23]).trim() : '';
+        let fechaPagoLimpia = 'N/A';
 
-                const idClean = String(operacion || cedula || i).replace(/[^a-zA-Z0-9]/g, '');
-
-                let saldoActual = cleanSaldo;
-                if (cobros[idClean]) {
-                    const totalCobrado = cobros[idClean].reduce((acc, curr) => acc + curr.monto, 0);
-                    saldoActual = Math.max(0, cleanSaldo - totalCobrado);
-                }
-
-                newCredits.push({
-                    id: idClean,
-                    nombre: String(nombre).trim(),
-                    cedula: String(cedula).trim(),
-                    operacion: String(operacion).trim(),
-                    saldo: isNaN(saldoActual) ? 0 : saldoActual,
-                    diasMora: isNaN(diasMora) ? 0 : diasMora,
-                    telefono: String(telefono).trim(),
-                    oficial: oficialVal,
-                    direccion: String(direccion).trim(),
-                    fechaPago: String(fechaPago).trim()
-                });
+        if (rawFechaPago) {
+            if (rawFechaPago.includes('T')) {
+                // Si viene como "2026-11-15T08:00:00.000Z", extrae únicamente "2026-11-15"
+                fechaPagoLimpia = rawFechaPago.split('T')[0];
+            } else {
+                fechaPagoLimpia = rawFechaPago;
             }
-
-            credits = newCredits;
-            populateOficialesDropdown();
-            applyFilters();
         }
+        // --------------------------------
+
+        const direccion = r[idxDireccion !== -1 ? idxDireccion : 50] || '';
+        const telefono = r[idxTelefono !== -1 ? idxTelefono : 51] || '';
+
+        const idClean = String(operacion || cedula || i).replace(/[^a-zA-Z0-9]/g, '');
+
+        let saldoActual = cleanSaldo;
+        if (cobros[idClean]) {
+            const totalCobrado = cobros[idClean].reduce((acc, curr) => acc + curr.monto, 0);
+            saldoActual = Math.max(0, cleanSaldo - totalCobrado);
+        }
+
+        newCredits.push({
+            id: idClean,
+            nombre: String(nombre).trim(),
+            cedula: String(cedula).trim(),
+            operacion: String(operacion).trim(),
+            saldo: isNaN(saldoActual) ? 0 : saldoActual,
+            diasMora: isNaN(diasMora) ? 0 : diasMora,
+            telefono: String(telefono).trim(),
+            oficial: oficialVal,
+            direccion: String(direccion).trim(),
+            fechaPago: fechaPagoLimpia
+        });
+    }
+
+    credits = newCredits;
+    populateOficialesDropdown();
+    applyFilters();
+}
 
       // CONSULTA DE TABLA DE AMORTIZACIÓN VÍA PROXY GOOGLE APPS SCRIPT
 async function consultarTablaAmortizacion(numPrestamo, nombreSocio) {
