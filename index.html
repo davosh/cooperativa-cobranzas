@@ -259,7 +259,7 @@
     </div>
 
     <script>
-        // URL del Apps Script y API de Amortización
+        // Configuración de URLs y Tokens
         const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxdQkSB6p4AiVIQv9HtbLy6DFNdbe_hU-VkY7d0u9OTfR3qA4GCgKclUplDk1uvdaPs/exec';
         const SECRET_TOKEN = 'ECUACREDITOS_AGENCIA_IBARRA_2026_SECURE_KEY';
         const API_AMORTIZACION_URL = 'https://fine-firmly-griffon.ngrok-free.app/consultaTablaAmortizacion';
@@ -463,7 +463,8 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'ngrok-skip-browser-warning': 'true' // Evita la pantalla intermedia de aviso ngrok
+                        'ngrok-skip-browser-warning': '69420',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({
                         numeroprestamo: String(numPrestamo).trim()
@@ -471,13 +472,12 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Error en el servidor API (${response.status})`);
+                    throw new Error(`Error en la API (${response.status})`);
                 }
 
                 const data = await response.json();
                 loading.style.display = 'none';
 
-                // Normalizar respuesta si viene dentro de una propiedad o array
                 let listaCuotas = Array.isArray(data) ? data : (data.tabla || data.cuotas || data.data || []);
                 
                 if (listaCuotas.length === 0) {
@@ -485,7 +485,6 @@
                     return;
                 }
 
-                // Generar tabla HTML dinámicamente
                 let html = `
                     <p style="margin-bottom: 8px;"><b>Socio:</b> ${nombreSocio}</p>
                     <table class="amort-table">
@@ -531,7 +530,7 @@
             } catch (err) {
                 console.error("Error al consultar amortización:", err);
                 loading.style.display = 'none';
-                errorDiv.innerText = `❌ No se pudo consultar la tabla de amortización: ${err.message}`;
+                errorDiv.innerText = `❌ No se pudo consultar la tabla de amortización: ${err.message}. Verifique que el servicio ngrok esté encendido.`;
                 errorDiv.style.display = 'block';
             }
         }
