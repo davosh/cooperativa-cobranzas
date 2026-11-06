@@ -61,15 +61,6 @@
             </div>
         </div>
 
-        <!-- Pestañas de Acceso Rápido -->
-        <div class="tabs-container">
-            <button class="tab-btn active" onclick="switchTab('PAGAN_HOY', this)">🔥 Hoy / Compromisos</button>
-            <button class="tab-btn" onclick="switchTab('TODOS', this)">📁 Toda la Cartera</button>
-            <button class="tab-btn" onclick="switchTab('CON_COMPROMISO', this)">🤝 Con Compromiso</button>
-            <button class="tab-btn" onclick="switchTab('EN_MORA', this)">⚠️ En Mora</button>
-            <button class="tab-btn" onclick="switchTab('CANCELADO', this)">✅ Cancelados</button>
-        </div>
-
         <!-- Filtros Secundarios -->
         <div class="card grid-3">
             <div>
@@ -97,6 +88,15 @@
         <div class="card">
             <h2>Socios en Cartera (<span id="count">0</span>)</h2>
             <div id="clientsList">Cargando base de datos compartida...</div>
+        </div>
+
+        <!-- Pie de Página Fijo (Bottom Navigation Tab Bar) -->
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchTab('PAGAN_HOY', this)">🔥 Hoy</button>
+            <button class="tab-btn" onclick="switchTab('TODOS', this)">📁 Cartera</button>
+            <button class="tab-btn" onclick="switchTab('CON_COMPROMISO', this)">🤝 Acuerdos</button>
+            <button class="tab-btn" onclick="switchTab('EN_MORA', this)">⚠️ Mora</button>
+            <button class="tab-btn" onclick="switchTab('CANCELADO', this)">✅ Al Día</button>
         </div>
     </div>
 
