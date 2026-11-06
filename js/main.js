@@ -140,25 +140,65 @@ function registrarCobro(id) {
     }
 }
 
+// ABRIR MODAL CON CALENDARIO INTERACTIVO
 function registrarCompromiso(id) {
-    const fechaCompromiso = prompt("Fecha pactada para el pago (AAAA-MM-DD):", new Date().toISOString().split('T')[0]);
-    if (!fechaCompromiso) return;
+    const item = credits.find(c => c.id === id);
+    if (!item) return;
 
-    const montoCompromiso = prompt("Monto pactado a cancelar ($):");
-    if (!montoCompromiso) return;
+    document.getElementById('compSocioId').value = id;
+    
+    // Asignar por defecto la fecha de hoy en el calendario
+    const hoyISO = new Date().toISOString().split('T')[0];
+    document.getElementById('compFecha').value = hoyISO;
+    
+    // Sugerir el saldo pendiente como monto por defecto
+    document.getElementById('compMonto').value = item.saldo.toFixed(2);
+    document.getElementById('compDetalle').value = 'Pago pactado en ventanilla';
 
-    const detalle = prompt("Observación del acuerdo:", "Pago en ventanilla");
+    document.getElementById('modalCompromiso').style.display = 'flex';
+}
+
+function cerrarModalCompromiso() {
+    document.getElementById('modalCompromiso').style.display = 'none';
+}
+
+// GUARDAR EL COMPROMISO EN FIREBASE
+function guardarCompromisoDesdeModal() {
+    const id = document.getElementById('compSocioId').value;
+    const fechaCompromiso = document.getElementById('compFecha').value;
+    const montoInput = document.getElementById('compMonto').value;
+    const detalle = document.getElementById('compDetalle').value.trim();
+
+    if (!id || !fechaCompromiso || !montoInput) {
+        alert("Por favor completa los campos requeridos.");
+        return;
+    }
+
+    const montoVal = parseFloat(montoInput);
+    if (isNaN(montoVal) || montoVal <= 0) {
+        alert("Ingrese un monto válido.");
+        return;
+    }
+
     const fechaHora = new Date().toLocaleString('es-EC');
 
+    // Registrar en Firebase Realtime Database
     db.ref(`coop_compromisos/${id}`).set({
         fecha: fechaCompromiso,
-        monto: parseFloat(montoCompromiso.replace(',', '.')),
-        observacion: detalle || ''
+        monto: montoVal,
+        observacion: detalle || 'Pago en ventanilla'
     });
 
     const listaGestiones = gestiones[id] || [];
-    listaGestiones.unshift({ fecha: fechaHora, nota: `🤝 COMPROMISO PACTADO: $${montoCompromiso} para el ${fechaCompromiso}. Obs: ${detalle}` });
+    listaGestiones.unshift({ 
+        fecha: fechaHora, 
+        nota: `🤝 COMPROMISO PACTADO: $${montoVal.toFixed(2)} para el ${fechaCompromiso}. Obs: ${detalle}` 
+    });
+    
     db.ref(`coop_gestiones/${id}`).set(listaGestiones);
+
+    cerrarModalCompromiso();
+    alert("¡Compromiso registrado con éxito!");
 }
 
 function populateOficialesDropdown() {
