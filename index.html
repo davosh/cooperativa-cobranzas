@@ -32,35 +32,46 @@
         <div id="loginError" class="error-msg"></div>
     </div>
 
-    <!-- Contenido Principal (Protegido - Solo visible tras Iniciar Sesión) -->
+  <!-- Contenido Principal (Protegido) -->
     <div id="appContent">
-        <div class="top-bar">
-            <span>👤 Sesión activa: <strong id="userDisplay">...</strong></span>
-            <button class="btn-logout" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
-        </div>
+        
+        <!-- Encabezado Principal Profesional -->
+        <header class="app-header">
+            <div class="top-bar">
+                <div class="user-badge">
+                    <span class="user-status-dot"></span>
+                    <span><strong id="userDisplay">Cargando...</strong></span>
+                </div>
+                <button class="btn-logout" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
+            </div>
 
-        <h1>🏢 Control de Cobranzas y Seguimiento Compartido</h1>
+            <div class="header-title-container">
+                <h1>🏢 Sistema de Cobranzas y Campo</h1>
+                <div class="header-subtitle">Gestión Colaborativa de Cartera | Agencia Ibarra</div>
+            </div>
 
-        <!-- KPI Resumen Global -->
-        <div class="kpi-container">
-            <div>
-                <div class="kpi-title">Socios Registrados</div>
-                <div class="kpi-value" id="kpiTotal">0</div>
+            <!-- KPIs Rediseñados en Grid Responsivo -->
+            <div class="kpi-container">
+                <div class="kpi-card">
+                    <div class="kpi-title">Socios</div>
+                    <div class="kpi-value" id="kpiTotal">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Saldo en Riesgo</div>
+                    <div class="kpi-value" id="kpiSaldo">$0.00</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Pagan Hoy</div>
+                    <div class="kpi-value" id="kpiHoy" style="color: #60a5fa;">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Recaudado Hoy</div>
+                    <div class="kpi-value" id="kpiRecaudado" style="color: #34d399;">$0.00</div>
+                </div>
             </div>
-            <div>
-                <div class="kpi-title">Saldo en Riesgo</div>
-                <div class="kpi-value" id="kpiSaldo">$0.00</div>
-            </div>
-            <div>
-                <div class="kpi-title">Pagan Hoy / Compromisos</div>
-                <div class="kpi-value" id="kpiHoy">0</div>
-            </div>
-            <div>
-                <div class="kpi-title">Recaudado Hoy (Agencia)</div>
-                <div class="kpi-value" id="kpiRecaudado" style="color: #34d399;">$0.00</div>
-            </div>
-        </div>
+        </header>
 
+       
         <!-- Filtros Secundarios -->
         <div class="card grid-3">
             <div>
