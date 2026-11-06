@@ -1,4 +1,67 @@
-<!-- Pestañas de Acceso Rápido -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Colaborativo de Cobranzas y Campo</title>
+    <!-- Hoja de Estilos Externa -->
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- SDKs de Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+
+    <!-- Pantalla de Login -->
+    <div id="loginScreen" class="card">
+        <div class="login-header">🏢 Acceso al Sistema de Cobranzas</div>
+        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 16px;">Ingrese sus credenciales para continuar</p>
+        <form onsubmit="event.preventDefault(); ejecutarLogin();">
+            <div style="text-align: left; margin-bottom: 12px;">
+                <label>Correo Electrónico</label>
+                <input type="email" id="loginEmail" placeholder="ejemplo@cooperativa.fin.ec" required>
+            </div>
+            <div style="text-align: left; margin-bottom: 16px;">
+                <label>Contraseña</label>
+                <input type="password" id="loginPassword" placeholder="••••••••" required>
+            </div>
+            <button id="btnLogin" type="submit">🔒 Iniciar Sesión</button>
+        </form>
+        <div id="loginError" class="error-msg"></div>
+    </div>
+
+    <!-- Contenido Principal (Protegido) -->
+    <div id="appContent">
+        <div class="top-bar">
+            <span>👤 Sesión activa: <strong id="userDisplay">...</strong></span>
+            <button class="btn-logout" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
+        </div>
+
+        <h1>🏢 Control de Cobranzas y Seguimiento Compartido</h1>
+
+        <!-- KPI Resumen Global -->
+        <div class="kpi-container">
+            <div>
+                <div class="kpi-title">Socios Registrados</div>
+                <div class="kpi-value" id="kpiTotal">0</div>
+            </div>
+            <div>
+                <div class="kpi-title">Saldo en Riesgo</div>
+                <div class="kpi-value" id="kpiSaldo">$0.00</div>
+            </div>
+            <div>
+                <div class="kpi-title">Pagan Hoy / Compromisos</div>
+                <div class="kpi-value" id="kpiHoy">0</div>
+            </div>
+            <div>
+                <div class="kpi-title">Recaudado Hoy (Agencia)</div>
+                <div class="kpi-value" id="kpiRecaudado" style="color: #34d399;">$0.00</div>
+            </div>
+        </div>
+
+        <!-- Pestañas de Acceso Rápido -->
         <div class="tabs-container">
             <button class="tab-btn active" onclick="switchTab('PAGAN_HOY', this)">🔥 Hoy / Compromisos</button>
             <button class="tab-btn" onclick="switchTab('TODOS', this)">📁 Toda la Cartera</button>
@@ -29,3 +92,36 @@
                 <input type="text" id="searchInput" placeholder="Escribe para buscar..." onkeyup="applyFilters()">
             </div>
         </div>
+
+        <!-- Lista de Socios -->
+        <div class="card">
+            <h2>Socios en Cartera (<span id="count">0</span>)</h2>
+            <div id="clientsList">Cargando base de datos compartida...</div>
+        </div>
+    </div>
+
+    <!-- Modal para Tabla de Amortización -->
+    <div id="modalAmortizacion" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">📋 Tabla de Amortización</h3>
+                <button class="close-btn" onclick="cerrarModalAmortizacion()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modalLoading" style="text-align: center; padding: 20px; font-weight: bold; color: var(--primary);">
+                    📡 Consultando API de la Cooperativa...
+                </div>
+                <div id="modalError" class="error-msg" style="margin-bottom: 12px;"></div>
+                <div id="modalTableContainer" class="table-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Módulos JavaScript -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/gps.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

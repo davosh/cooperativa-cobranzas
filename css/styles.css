@@ -1,4 +1,4 @@
-/* Estilos para Pestañas de Navegación */
+/* Pestañas de Navegación Rápida */
 .tabs-container {
     display: flex;
     gap: 6px;
@@ -21,9 +21,7 @@
     width: auto;
 }
 
-.tab-btn:hover {
-    background: #cbd5e1;
-}
+.tab-btn:hover { background: #cbd5e1; }
 
 .tab-btn.active {
     background: var(--primary);

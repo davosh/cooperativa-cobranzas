@@ -20,3 +20,4 @@ let credits = [];
 let gestiones = {};
 let compromisos = {};
 let cobros = {};
+let currentTab = 'PAGAN_HOY'; // Estado predeterminado: Carga primero los pagos/compromisos de hoy

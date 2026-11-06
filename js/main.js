@@ -1,6 +1,3 @@
-// Estado predeterminado: Carga primero los socios que pagan hoy o tienen compromiso hoy
-let currentTab = 'PAGAN_HOY';
-
 function switchTab(tabName, element) {
     currentTab = tabName;
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -40,7 +37,6 @@ function applyFilters() {
         return matchOficial && matchSearch && matchEstado;
     });
 
-    // Ordenamiento según la prioridad elegida
     if (sortBy === 'mora_desc') {
         result.sort((a, b) => b.diasMora - a.diasMora);
     } else if (sortBy === 'saldo_desc') {
