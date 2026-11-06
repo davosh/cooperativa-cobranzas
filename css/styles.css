@@ -20,10 +20,12 @@ body {
     color: var(--text);
     margin: 0;
     padding: 12px;
-    padding-bottom: 75px; /* Espacio reservado para el menú fijo del pie de página */
+    padding-bottom: 70px; /* Reducido para evitar vacíos innecesarios */
     max-width: 980px;
     margin-left: auto;
     margin-right: auto;
+    min-height: 100vh;
+    box-sizing: border-box;
 }
 
 h1, h2 { margin-top: 0; color: var(--text); }
@@ -99,16 +101,17 @@ table.amort-table tr:nth-child(even) { background-color: #f8fafc; }
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    max-width: 100vw !important;
-    background-color: #0f172a !important; /* Fondo oscuro elegante */
+    background-color: #0f172a !important;
     display: flex !important;
     justify-content: space-around !important;
     align-items: center !important;
-    padding: 10px 6px !important;
-    box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.25) !important;
-    z-index: 99999 !important; /* Prioridad máxima por encima de modales o tarjetas */
+    padding: 6px 4px !important;
+    /* Respeta la barra de gestos de los celulares */
+    padding-bottom: calc(6px + env(safe-area-inset-bottom)) !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2) !important;
+    z-index: 99999 !important;
     box-sizing: border-box !important;
-    -webkit-transform: translateZ(0); /* Forzar renderizado por GPU en móviles Safari/Chrome */
+    -webkit-transform: translateZ(0);
     transform: translateZ(0);
 }
 
@@ -116,9 +119,9 @@ table.amort-table tr:nth-child(even) { background-color: #f8fafc; }
     background: transparent;
     color: #94a3b8;
     border: none;
-    padding: 8px 4px;
+    padding: 6px 4px;
     border-radius: 8px;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
