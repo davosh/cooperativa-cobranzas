@@ -30,8 +30,9 @@ async function consultarTablaAmortizacion(numPrestamo, nombreSocio) {
     modal.style.display = 'flex';
 
     try {
-        const requestUrl = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&action=consultaAmortizacion&numeroprestamo=${encodeURIComponent(String(numPrestamo).trim())}`;
-        
+        // Sanitización estricta de parámetros antes de la consulta
+const numLimpio = String(numPrestamo).replace(/[^a-zA-Z0-9]/g, '');
+const requestUrl = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(SECRET_TOKEN)}&action=consultaAmortizacion&numeroprestamo=${encodeURIComponent(numLimpio)}`;
         const response = await fetch(requestUrl);
         if (!response.ok) throw new Error(`Error en el servidor proxy (${response.status})`);
 
@@ -123,3 +124,4 @@ async function consultarTablaAmortizacion(numPrestamo, nombreSocio) {
 function cerrarModalAmortizacion() {
     document.getElementById('modalAmortizacion').style.display = 'none';
 }
+

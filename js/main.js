@@ -277,7 +277,13 @@ function applyFilters() {
 }
 
 function render(data) {
-    const clientsList = document.getElementById('clientsList');
+    const listaVisitas = gestiones[item.id] || [];
+    let htmlVisitas = listaVisitas.length > 0 ? `
+    <div class="historial-box">
+        <strong>📌 Bitácora Compartida de la Agencia (${listaVisitas.length}):</strong>
+        ${listaVisitas.map(v => `<div class="visita-item"><small><b>[${escapeHTML(v.fecha)}]:</b> ${escapeHTML(v.nota)}</small></div>`).join('')}
+    </div>
+` : '';
     document.getElementById('count').innerText = data.length;
     clientsList.innerHTML = '';
 
@@ -414,4 +420,14 @@ function applyFilters() {
     document.getElementById('kpiRecaudado').innerText = '$' + totalRecaudadoHoy.toLocaleString('en-US', {minimumFractionDigits: 2});
 
     render(result);
+}
+// FUNCIÓN SANITIZADORA CONTRA XSS
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
