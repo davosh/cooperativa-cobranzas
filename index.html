@@ -14,7 +14,7 @@
 </head>
 <body>
 
-    <!-- Pantalla de Login -->
+    <!-- Pantalla de Login (SIN Pie de Página) -->
     <div id="loginScreen" class="card">
         <div class="login-header">🏢 Acceso al Sistema de Cobranzas</div>
         <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 16px;">Ingrese sus credenciales para continuar</p>
@@ -32,7 +32,7 @@
         <div id="loginError" class="error-msg"></div>
     </div>
 
-    <!-- Contenido Principal (Protegido) -->
+    <!-- Contenido Principal (Protegido - Solo visible tras Iniciar Sesión) -->
     <div id="appContent">
         <div class="top-bar">
             <span>👤 Sesión activa: <strong id="userDisplay">...</strong></span>
@@ -90,7 +90,14 @@
             <div id="clientsList">Cargando base de datos compartida...</div>
         </div>
 
-    
+        <!-- Pie de Página Fijo (DENTRO de #appContent para que no aparezca en Login) -->
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchTab('PAGAN_HOY', this)">🔥 Hoy</button>
+            <button class="tab-btn" onclick="switchTab('TODOS', this)">📁 Cartera</button>
+            <button class="tab-btn" onclick="switchTab('CON_COMPROMISO', this)">🤝 Acuerdos</button>
+            <button class="tab-btn" onclick="switchTab('EN_MORA', this)">⚠️ Mora</button>
+            <button class="tab-btn" onclick="switchTab('CANCELADO', this)">✅ Al Día</button>
+        </div>
     </div>
 
     <!-- Modal para Tabla de Amortización -->
@@ -116,14 +123,5 @@
     <script src="js/api.js"></script>
     <script src="js/gps.js"></script>
     <script src="js/main.js"></script>
-
-        <!-- Pie de Página Fijo (Bottom Navigation Tab Bar) -->
-        <div class="tabs-container">
-            <button class="tab-btn active" onclick="switchTab('PAGAN_HOY', this)">🔥 Hoy</button>
-            <button class="tab-btn" onclick="switchTab('TODOS', this)">📁 Cartera</button>
-            <button class="tab-btn" onclick="switchTab('CON_COMPROMISO', this)">🤝 Acuerdos</button>
-            <button class="tab-btn" onclick="switchTab('EN_MORA', this)">⚠️ Mora</button>
-            <button class="tab-btn" onclick="switchTab('CANCELADO', this)">✅ Al Día</button>
-        </div>
 </body>
 </html>
